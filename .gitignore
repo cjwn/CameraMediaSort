@@ -1,0 +1,11 @@
+preview-out/
+*-test-in/
+*-test-out/
+_media_sort_incoming_*/
+.tools/
+.publish/
+*.log
+.env
+.env.*
+*.pem
+*.key
