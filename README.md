@@ -2,9 +2,15 @@
 
 Windows 相机照片、视频与 RAW 文件整理脚本，使用 PowerShell、Windows Shell 元数据和可选的 robocopy，无需 Python。
 
+当前为早期测试版。文件传输自动化测试已通过；真实设备的日期元数据兼容性仍需更多测试。
+
 详细用法见 [使用说明](使用说明.md)。保持 BAT 和 PS1 文件在同一文件夹。
 
 ## 快速开始
+
+双击 `CameraMediaSort.bat` 打开 Windows 原生窗口，选择 Source（源文件夹）和 Destination（目标文件夹），点 Preview 预览，点 Start 执行。默认 Move（移动），可选 Copy（复制）；Subfolders 包含子文件夹，Robocopy staging 启用暂存模式。路径输入框也支持拖入文件夹。
+
+窗口显示文件进度、平均传输速度和日期目录数量。普通传输在每个文件完成后更新进度，大文件传输中可能暂时停住；详细日志保存在系统临时目录 `CameraMediaSort-*` 中。移动任务启动前会要求确认。
 
 把源文件夹拖到 `Drop-SortMediaByDate.bat`，选择目标位置，检查预览后操作：
 
@@ -42,3 +48,11 @@ Windows 相机照片、视频与 RAW 文件整理脚本，使用 PowerShell、Wi
 ## 隐私与公开代码
 
 整理脚本没有上传媒体或联网逻辑，公开脚本本身不会公开本地照片。发布仓库时只纳入源代码和文档，排除真实素材、日志、凭据与临时目录。
+
+## 本地测试
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Smoke-Test.ps1
+```
+
+测试在系统临时目录生成独立素材，覆盖预览、复制、重名、移动、robocopy 复制与移动，并核对 SHA-256、完成进度及目录数量。测试含生成的有效 JPEG 和模拟 RAW/视频字节，后两者只验证文件筛选和传输，不验证真实 RAW/视频元数据识别。测试日志和素材会保留在输出的临时目录中。

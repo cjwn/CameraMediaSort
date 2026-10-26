@@ -13,10 +13,28 @@ param(
 
   [switch]$Preview,
 
-  [switch]$UseRobocopy
+  [switch]$UseRobocopy,
+
+  [string]$StatusFile
 )
 
 $ErrorActionPreference = "Stop"
+
+function Write-RunStatus {
+  param([string]$Stage, [int]$Done = 0, [int]$Total = 0, [string]$CurrentFile = '')
+  if (-not $StatusFile) { return }
+  $rows = @($summary | ForEach-Object { @{ Folder = $_.Name; Count = $_.Count } })
+  $state = @{
+    Stage = $Stage; Done = $Done; Total = $Total; CurrentFile = $CurrentFile
+    Folders = $rows
+  }
+  if ($transferWatch -and $transferWatch.Elapsed.TotalSeconds -gt 0) {
+    $state.MBps = [math]::Round($completedBytes / 1MB / $transferWatch.Elapsed.TotalSeconds, 1)
+  }
+  [IO.File]::WriteAllText($StatusFile, ($state | ConvertTo-Json -Depth 5))
+}
+
+Write-RunStatus 'Scanning'
 
 $mediaExtensions = @(
   ".jpg", ".jpeg", ".png", ".heic", ".heif", ".gif", ".tif", ".tiff", ".hif",
@@ -173,6 +191,7 @@ $destinationItem = Get-Item -LiteralPath $Destination
 $stagingRoot = $null
 
 if ($UseRobocopy -and -not $Preview) {
+  Write-RunStatus 'Robocopy staging'
   $stagedSource = Invoke-RobocopyStage `
     -From $sourceItem.FullName `
     -To $destinationItem.FullName `
@@ -382,6 +401,7 @@ $actions = @($actionsList | Sort-Object { $_.File.FullName })
 
 if ($actions.Count -eq 0) {
   Write-Host "No photo or video files found."
+  Write-RunStatus 'No media files'
   exit 0
 }
 
@@ -418,10 +438,15 @@ if ($Preview) {
   Write-FolderSummary $summary
   Write-Host ""
   Write-Host "Preview only. No files were copied or moved."
+  Write-RunStatus 'Preview complete' 0 $actions.Count
   exit 0
 }
 
+$transferWatch = [Diagnostics.Stopwatch]::StartNew()
+$completedBytes = 0L
+$completedFiles = 0
 foreach ($action in $actions) {
+  Write-RunStatus 'Transferring' $completedFiles $actions.Count $action.File.Name
   if (-not (Test-Path -LiteralPath $action.TargetFolder -PathType Container)) {
     New-Item -ItemType Directory -Force -Path $action.TargetFolder | Out-Null
   }
@@ -429,6 +454,8 @@ foreach ($action in $actions) {
   $target = Get-SafeName -Folder $action.TargetFolder -FileName $action.File.Name
 
   Invoke-FileTransfer -File $action.File -Target $target -TransferMode $Mode
+  $completedBytes += $action.File.Length
+  $completedFiles++
 }
 
 Write-Host ""
@@ -450,3 +477,4 @@ if (-not [string]::IsNullOrWhiteSpace($stagingRoot) -and (Test-Path -LiteralPath
     Write-Warning "Staging folder still contains files and was preserved: $stagingRoot"
   }
 }
+Write-RunStatus 'Complete' $completedFiles $actions.Count
